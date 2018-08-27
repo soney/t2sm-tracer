@@ -1,11 +1,16 @@
+import './index.css';
+
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import App from './App';
-import './index.css';
 import registerServiceWorker from './registerServiceWorker';
+import { TraceGenerator } from './TraceGenerator';
+import { TraceTracker } from './TraceTracker';
 
 ReactDOM.render(
-  <App />,
-  document.getElementById('root') as HTMLElement
+    <div>
+        <TraceGenerator server='ws://localhost:8000' />
+        <TraceTracker server='ws://localhost:8000' />
+    </div>,
+    document.getElementById('root') as HTMLElement
 );
 registerServiceWorker();
