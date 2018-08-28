@@ -1,6 +1,7 @@
 import { keys } from 'lodash';
 import * as React from 'react';
 import { SDBClient, SDBDoc } from 'sdb-ts';
+import { FSMView } from './FSMView';
 // import { FSM } from 't2sm';
 // import { SDBBinding } from 't2sm/built/bindings/sharedb_binding';
 
@@ -29,6 +30,7 @@ export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrac
         const userIDDisplays: React.ReactNode[] = this.state.userIDs.map((uid) => {
             return (<div key={uid}>
                 {uid}:
+                <FSMView doc={this.doc} path={[uid]} />
             </div>);
         });
         return <div>
