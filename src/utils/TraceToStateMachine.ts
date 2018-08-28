@@ -1,4 +1,100 @@
+import { extend } from 'lodash';
 import { FSM } from 't2sm';
+import { ICTTStateData, ICTTTransitionData } from './ClientTraceTracker';
+
+export interface ITraceTreeState {
+    states: { [userID: string]: string };
+}
+export interface ITraceTreeTransition {
+    transitions: { [userID: string]: string };
+    data: ICTTTransitionData;
+}
+
+
+export class TraceToStateMachine {
+    private traceFSMs: Map<string, FSM<ICTTStateData, ICTTTransitionData>> = new Map();
+    private traceTree: FSM<ITraceTreeState, ITraceTreeTransition> = new FSM();
+
+    public constructor(private transitionsEqual: EqualityCheck<any> = defaultEqualityCheck) {
+        return;
+    }
+
+    public addUserFSM(userID: string, fsm: FSM<ICTTStateData, ICTTTransitionData>): void {
+        this.traceFSMs.set(userID, fsm);
+        this.updateTraceTree(userID);
+    }
+
+    public removeUserFSM(userID: string): void {
+        this.traceFSMs.delete(userID);
+    }
+
+    public getTraceTree(): FSM<ITraceTreeState, ITraceTreeTransition> {
+        return this.traceTree;
+    }
+
+    private updateTraceTree(userID: string): void {
+        const fsm = this.traceFSMs.get(userID) as FSM<ICTTStateData, ICTTTransitionData>;
+        const visitedStates: Set<string> = new Set();
+        let currentState: string = fsm.getStartState();
+        let ttState: string = this.traceTree.getStartState();
+        while (true) {
+            if (visitedStates.has(currentState)) {
+                throw new Error('Circular path; invalid trace');
+            } else {
+                visitedStates.add(currentState);
+            }
+
+            // for(let i: number = 0; i < ttOutgoingTransitions.length; i++) {
+            //     const ttot = ttOutgoingTransitions[i];
+            // }
+            console.log(currentState);
+
+            const outgoingTransitions = fsm.getOutgoingTransitions(currentState);
+            if(outgoingTransitions.length === 1) {
+                const outgoingTransition = outgoingTransitions[0];
+                const nextState = fsm.getTransitionTo(outgoingTransition);
+                const tPayload = fsm.getTransitionPayload(outgoingTransition);
+
+                const ttOutgoingTransitions = this.traceTree.getOutgoingTransitions(ttState);
+                let closestTransition: string | null = null;
+                for(const i in ttOutgoingTransitions) {
+                    if (ttOutgoingTransitions.hasOwnProperty(i)) {
+                        const ttot = ttOutgoingTransitions[i];
+                        const payload: ITraceTreeTransition = this.traceTree.getTransitionPayload(ttot);
+                        if (payload.transitions.hasOwnProperty(userID) && payload.transitions[userID] === outgoingTransition) {
+                            closestTransition = ttot;
+                            break;
+                        } else if (this.transitionsEqual(payload.data, tPayload)) {
+                            closestTransition = ttot;
+                            const newPayloadTransitions = extend({}, payload.transitions);
+                            newPayloadTransitions[userID] = outgoingTransition;
+                            break;
+                        }
+                    }
+                }
+
+                if (closestTransition === null) {
+                    const states = {};
+                    const transitions = {};
+                    states[userID] = nextState;
+                    transitions[userID] = outgoingTransition;
+                    const newState = this.traceTree.addState({ states });
+                    closestTransition = this.traceTree.addTransition(ttState, newState, {
+                        data: tPayload, transitions
+                    });
+                }
+
+                ttState = this.traceTree.getTransitionTo(closestTransition);
+
+                currentState = nextState;
+            } else if (outgoingTransitions.length === 0) {
+                break;
+            } else {
+                throw new Error('Multiple outgoing transition; invalid trace');
+            }
+        }
+    }
+}
 
 // type Pair<E> = [E, E];
 export type EqualityCheck<E> = (i1:E, i2:E) => boolean;
