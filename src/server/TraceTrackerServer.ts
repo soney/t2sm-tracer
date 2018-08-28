@@ -31,7 +31,9 @@ export class TraceTrackerServer {
         this.inputDoc.subscribe(this.onUserTracesUpdate);
 
         this.outputDoc = this.sdbServer.get('t2sm', 'generatedFSMs');
-        this.outputDoc.createIfEmpty({});
+        this.outputDoc.createIfEmpty({
+            'traceTree': {}
+        });
         this.traceTreeBinding = new SDBBinding(this.outputDoc, ['traceTree'], this.ttsm.getTraceTree());
     }
 
@@ -43,7 +45,7 @@ export class TraceTrackerServer {
     private addUserFSM(userID: string): void {
         const binding = new SDBBinding(this.inputDoc, [userID]);
         this.bindings.set(userID, binding);
-        this.ttsm.addUserFSM(userID, binding);
+        this.ttsm.addUserFSM(userID, binding.getFSM());
     }
 
     private removeUserFSM(userID: string): void {

@@ -79,7 +79,7 @@ export class TraceToStateMachine {
                     states[userID] = nextState;
                     transitions[userID] = outgoingTransition;
                     const newState = this.traceTree.addState({ states });
-                    closestTransition = this.traceTree.addTransition(ttState, newState, {
+                    closestTransition = this.traceTree.addTransition(ttState, newState, undefined, {
                         data: tPayload, transitions
                     });
                 }
