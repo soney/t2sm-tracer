@@ -16,6 +16,7 @@ export interface ITraceTreeTransition {
 export class TraceToStateMachine {
     private traceFSMs: Map<string, FSM<ICTTStateData, ICTTTransitionData>> = new Map();
     private traceTree: FSM<ITraceTreeState, ITraceTreeTransition> = new FSM();
+    private outputFSM: FSM<ITraceTreeState, ITraceTreeTransition> = new FSM();
 
     public constructor(private transitionsEqual: EqualityCheck<any> = defaultEqualityCheck) {
         return;
@@ -24,9 +25,13 @@ export class TraceToStateMachine {
     public addUserFSM(userID: string, fsm: FSM<ICTTStateData, ICTTTransitionData>): void {
         this.traceFSMs.set(userID, fsm);
         this.updateTraceTree(userID);
+        cloneIntoFSM(this.traceTree, this.outputFSM);
+        iterateMerge(this.outputFSM, this.transitionsEqual);
         fsm.addListener('transitionAdded', () => {
             this.updateTraceTree(userID);
-        })
+            cloneIntoFSM(this.traceTree, this.outputFSM);
+            iterateMerge(this.outputFSM, this.transitionsEqual);
+        });
     }
 
     public removeUserFSM(userID: string): void {
@@ -35,6 +40,10 @@ export class TraceToStateMachine {
 
     public getTraceTree(): FSM<ITraceTreeState, ITraceTreeTransition> {
         return this.traceTree;
+    }
+
+    public getOutputFSM(): FSM<ITraceTreeState, ITraceTreeTransition> {
+        return this.outputFSM;
     }
 
     private updateTraceTree(userID: string): void {
@@ -182,9 +191,12 @@ function iterateMerge(fsm: FSM<any, any>, transitionsEqual: EqualityCheck<any>):
     const similarityScores = computeSimilarityScores(fsm, transitionsEqual);
     const sortedStates = Array.from(similarityScores.entries()).sort((a, b) => b[1]-a[1]);
 
+    console.log(sortedStates);
     if(sortedStates.length > 0) {
         const [toMergeS1, toMergeS2] = sortedStates[0][0];
-        mergeStates(fsm, toMergeS1, toMergeS2);
+        if (toMergeS1 !== fsm.getStartState() && toMergeS2 !== fsm.getStartState()) {
+            mergeStates(fsm, toMergeS1, toMergeS2);
+        }
     }
 };
 
@@ -208,7 +220,7 @@ function getStatePairs(fsm: FSM<any, any>):Array<Pair<string>> {
  * Compute a similarity score of every pair of states
  */
 function computeSimilarityScores(fsm: FSM<any, any>, transitionsEqual: EqualityCheck<any>):Map<Pair<string>, number> {
-    const numCommonTransitions = new HashMap<Pair<string>, number>((p1, p2) => p1[0]===p2[0] && p1[1]===p2[1], (p)=> p[0] + p[1]);
+    const numCommonTransitions = new HashMap<Pair<string>, number>((p1, p2) => p1[0]===p2[0] && p1[1]===p2[1], (p) => p[0] + p[1]);
     const statePairs = getStatePairs(fsm);
     const equivalentOutgoingTransitions:Map<Pair<string>, Array<Pair<string>>> = new Map<Pair<string>, Array<Pair<string>>>();
     statePairs.forEach((p) => {
@@ -223,8 +235,8 @@ function computeSimilarityScores(fsm: FSM<any, any>, transitionsEqual: EqualityC
         equivTransitions.forEach((et) => {
             const [t1, t2] = et;
 
-            const t1Dest = fsm.getToState(t1);
-            const t2Dest = fsm.getToState(t2);
+            const t1Dest = fsm.getTransitionTo(t1);
+            const t2Dest = fsm.getTransitionTo(t2);
             const similarityScore:number = numCommonTransitions.get([t1Dest, t2Dest]) || numCommonTransitions.get([t2Dest, t1Dest]) as number;
             rv.set(p, numCommonTransitions.get(p) as number + similarityScore);
         });
@@ -253,3 +265,16 @@ function equivalentTransitions(fsm: FSM<any, any>, transitionSet1:string[], tran
     }
     return rv;
 };
+
+function cloneIntoFSM(sourceFSM: FSM<any, any>, targetFSM: FSM<any, any>): void {
+    const states = targetFSM.getStates().filter(s => s !== targetFSM.getStartState());
+    states.forEach((s) => targetFSM.removeState(s));
+    const sourceStates = sourceFSM.getStates().filter(s => s !== sourceFSM.getStartState());
+    sourceStates.forEach((s) => {
+        targetFSM.addState(sourceFSM.getStatePayload(s), s);
+    });
+    const sourceTransitions = sourceFSM.getTransitions();
+    sourceTransitions.forEach((t) => {
+        targetFSM.addTransition(sourceFSM.getTransitionFrom(t), sourceFSM.getTransitionTo(t), sourceFSM.getTransitionAlias(t), sourceFSM.getTransitionPayload(t), t);
+    });
+}

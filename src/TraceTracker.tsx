@@ -38,6 +38,7 @@ export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrac
             </div>);
         });
         return <div>
+            <FSMView doc={this.generatedFSMsDoc} path={['outputFSM']} />
             <FSMView doc={this.generatedFSMsDoc} path={['traceTree']} />
             {userIDDisplays}
         </div>;

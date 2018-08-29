@@ -18,6 +18,7 @@ export class TraceTrackerServer {
     private outputDoc: SDBDoc<any>;
     private bindings: Map<string, SDBBinding> = new Map();
     private traceTreeBinding: SDBBinding;
+    private outputFSMBinding: SDBBinding;
     private ttsm: TraceToStateMachine = new TraceToStateMachine();
     public constructor(private port: number) {
         this.app = express();
@@ -35,6 +36,7 @@ export class TraceTrackerServer {
             'traceTree': {}
         }).then(() => {
             this.traceTreeBinding = new SDBBinding(this.outputDoc, ['traceTree'], this.ttsm.getTraceTree());
+            this.outputFSMBinding = new SDBBinding(this.outputDoc, ['outputFSM'], this.ttsm.getOutputFSM());
         });
     }
 
