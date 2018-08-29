@@ -36,15 +36,21 @@ export class ClientTraceTracker {
         }
     }
 
+    public ready: Promise<void>;
+
     private fsm: FSM<ICTTStateData, ICTTTransitionData> = new FSM<ICTTStateData, ICTTTransitionData>();
+    private outputFSM: FSM<any, any>;
     private ws: WebSocket;
     private sdbClient: SDBClient;
-    private sdbDoc: SDBDoc<any>;
-    private sdbBinding: SDBBinding;
+    private traceDoc: SDBDoc<any>;
+    private traceFSMBinding: SDBBinding;
+    private outputDoc: SDBDoc<any>;
+    private outputFSMBinding: SDBBinding;
     private currentState: string;
 
+
     public constructor(serverURL: string, clientID: string) {
-        this.initialize(serverURL, clientID);
+        this.ready = this.initialize(serverURL, clientID);
     }
 
     public addEvent(eventType: string, target: HTMLElement, manualLabel?: string): void {
@@ -57,14 +63,27 @@ export class ClientTraceTracker {
         this.fsm.addTransition(previousState, this.currentState, undefined, payload);
     }
 
+    public destroy() {
+        this.traceFSMBinding.destroy();
+    }
+
+    public getOutputFSM(): FSM<any, any> {
+        return this.outputFSM;
+    }
+
     private async initialize(serverURL: string, clientID: string): Promise<void> {
         this.ws = new WebSocket(serverURL);
         this.sdbClient = new SDBClient(this.ws);
-        this.sdbDoc = this.sdbClient.get('t2sm', 'userTraces');
-        await this.sdbDoc.fetch();
-        this.sdbBinding = new SDBBinding(this.sdbDoc, [clientID], this.fsm);
+        this.traceDoc = this.sdbClient.get('t2sm', 'userTraces');
+        await this.traceDoc.fetch();
+        this.traceFSMBinding = new SDBBinding(this.traceDoc, [clientID], this.fsm);
 
         this.currentState = this.fsm.addState({});
         this.fsm.addTransition(this.fsm.getStartState(), this.currentState, undefined, { eventType: '(start)', target: null, textContent: null});
+
+        this.outputDoc = this.sdbClient.get('t2sm', 'generatedFSMs');
+        await this.outputDoc.fetch();
+        this.outputFSMBinding = new SDBBinding(this.outputDoc, ['outputFSM']);
+        this.outputFSM = this.outputFSMBinding.getFSM();
     }
 }

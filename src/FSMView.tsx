@@ -42,7 +42,7 @@ export class FSMView extends React.Component<IStateMachineDisplayProps, IStateMa
                 const display = new StateMachineDisplay(this.fsm, el , (fod: ForeignObjectDisplay) => {
                     const payload = fod.getPayload();
                     if(fod.getDisplayType() === DISPLAY_TYPE.STATE) {
-                        return '';
+                        return `${fod.getName()}`;
                     } else {
                         const { eventType, data, textContent, target, transitions } = payload;
                         if (transitions) {
@@ -53,6 +53,9 @@ export class FSMView extends React.Component<IStateMachineDisplayProps, IStateMa
                             return `${eventType}`;
                         }
                     }
+                }, {
+                    animationDuration: 0,
+                    transitionAnimationDuration: 0
                 });
             });
         }

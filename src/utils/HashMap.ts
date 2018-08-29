@@ -33,7 +33,7 @@ export class HashMap<K, V> {
         }
         return this;
     };
-    public get(key:K): V | undefined {
+    public get(key:K, dfault?: V): V | undefined {
         const hash = this.hash(key);
         if(this.map.has(hash)) {
             const kvPairs = this.map.get(hash) as Array<[K,V]>;
@@ -43,7 +43,8 @@ export class HashMap<K, V> {
                 }
             }
         }
-        return undefined;
+
+        return dfault;
     };
     public has(key:K):boolean {
         const hash = this.hash(key);

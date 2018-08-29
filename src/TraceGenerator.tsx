@@ -25,12 +25,36 @@ export class TraceGenerator extends React.Component<ITraceGeneratorProps, ITrace
     }
 
     public render(): React.ReactNode {
-        return <div>
+        return <div ref={this.divRef}>
             <button onClick={this.btnClick}>Button 1</button>
             <button onClick={this.btnClick}>Button 2</button>
             <button onClick={this.btnClick}>Button 3</button>
             <button onClick={this.btnClick}>Button 4</button>
         </div>;
+    }
+
+    private divRef = (el: HTMLDivElement) : void => {
+        setTimeout(async () => {
+            const buttons = document.getElementsByTagName("button");
+            return;
+
+            this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+            await this.traceTracker.ready;
+            buttons[0].click();
+            buttons[0].click();
+            this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+            await this.traceTracker.ready;
+            buttons[0].click();
+            buttons[1].click();
+            this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+            await this.traceTracker.ready;
+            buttons[1].click();
+            buttons[0].click();
+            this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+            await this.traceTracker.ready;
+            buttons[1].click();
+            buttons[1].click();
+        }, 1000);
     }
 
     private btnClick = (event: React.MouseEvent): void => {

@@ -127,7 +127,7 @@ function defaultEqualityCheck (a: any, b: any): boolean {
 /**
  * Merge two states together
  */
-export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:string, removeStaleStates:boolean=true, transitionsEqual: EqualityCheck<any> = defaultEqualityCheck):void {
+export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:string, transitionsEqual: EqualityCheck<any> = defaultEqualityCheck, removeStaleStates: boolean = true):void {
     const mergeIntoOutgoingTransitions = fsm.getOutgoingTransitions(mergeInto);
     const outgoingTransitionTargets = new Set<string>();
 
@@ -173,6 +173,7 @@ export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:st
         }
     } while (incomingTransitions.length > 0);
 
+    console.log(removeState);
     fsm.removeState(removeState);
 
     if (removeStaleStates) {
@@ -191,11 +192,14 @@ function iterateMerge(fsm: FSM<any, any>, transitionsEqual: EqualityCheck<any>):
     const similarityScores = computeSimilarityScores(fsm, transitionsEqual);
     const sortedStates = Array.from(similarityScores.entries()).sort((a, b) => b[1]-a[1]);
 
-    console.log(sortedStates);
     if(sortedStates.length > 0) {
+        console.log(sortedStates);
         const [toMergeS1, toMergeS2] = sortedStates[0][0];
-        if (toMergeS1 !== fsm.getStartState() && toMergeS2 !== fsm.getStartState()) {
-            mergeStates(fsm, toMergeS1, toMergeS2);
+        const score = sortedStates[0][1];
+        if (score > 4) {
+            if (toMergeS1 !== fsm.getStartState() && toMergeS2 !== fsm.getStartState()) {
+                mergeStates(fsm, toMergeS1, toMergeS2, transitionsEqual);
+            }
         }
     }
 };
@@ -205,7 +209,7 @@ function iterateMerge(fsm: FSM<any, any>, transitionsEqual: EqualityCheck<any>):
  */
 function getStatePairs(fsm: FSM<any, any>):Array<Pair<string>> {
     const rv: Array<Pair<string>> = [];
-    const states = fsm.getStates();
+    const states = fsm.getStates().filter((s) => s !== fsm.getStartState());
     for(let i:number = 0; i<states.length; i++) {
         const si = states[i];
         for(let j:number = i+1; j<states.length; j++) {
@@ -232,12 +236,13 @@ function computeSimilarityScores(fsm: FSM<any, any>, transitionsEqual: EqualityC
     const rv = new Map<Pair<string>, number>();
     statePairs.forEach((p) => {
         const equivTransitions = equivalentOutgoingTransitions.get(p) as Array<Pair<string>>;
+        console.log(equivTransitions.map((t) => fsm.getTransitionPayload(t[0]).data.target.textContent + fsm.getTransitionPayload(t[1]).data.target.textContent));
         equivTransitions.forEach((et) => {
             const [t1, t2] = et;
 
             const t1Dest = fsm.getTransitionTo(t1);
             const t2Dest = fsm.getTransitionTo(t2);
-            const similarityScore:number = numCommonTransitions.get([t1Dest, t2Dest]) || numCommonTransitions.get([t2Dest, t1Dest]) as number;
+            const similarityScore:number = numCommonTransitions.get([t1Dest, t2Dest], 0) || numCommonTransitions.get([t2Dest, t1Dest], 0) as number;
             rv.set(p, numCommonTransitions.get(p) as number + similarityScore);
         });
     });

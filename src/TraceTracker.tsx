@@ -33,12 +33,14 @@ export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrac
     public render(): React.ReactNode {
         const userIDDisplays: React.ReactNode[] = this.state.userIDs.map((uid) => {
             return (<div key={uid}>
-                {uid}:
+                <h2>{uid}</h2>
                 <FSMView doc={this.tracesDoc} path={[uid]} />
             </div>);
         });
         return <div>
+            <h1>Output</h1>
             <FSMView doc={this.generatedFSMsDoc} path={['outputFSM']} />
+            <h1>Traces</h1>
             <FSMView doc={this.generatedFSMsDoc} path={['traceTree']} />
             {userIDDisplays}
         </div>;
