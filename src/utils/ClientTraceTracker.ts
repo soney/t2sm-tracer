@@ -7,19 +7,21 @@ export interface ICTTStateData {
 };
 export interface ICTTTransitionData {
     eventType: string;
+    textContent: string | null;
     target: ISerializedElement;
     manualLabel?: string;
 };
 
 export interface ISerializedElement {
     tagName: string;
+    textContent: string | null;
     attributes: { [name: string]: string };
     parent?: { element: ISerializedElement, childIndex: number }
 };
 
 export class ClientTraceTracker {
     private static serializeElement(el: HTMLElement): ISerializedElement {
-        const { tagName, parentElement } = el;
+        const { tagName, parentElement, textContent } = el;
         const attributes = { };
         for(let i: number = 0; i < el.attributes.length; i++) {
             const { name, value } = el.attributes.item(i) as Attr;
@@ -28,9 +30,9 @@ export class ClientTraceTracker {
         if (parentElement) {
             const childIndex = Array.prototype.indexOf.call(parentElement.childNodes, el);
             const sParent = ClientTraceTracker.serializeElement(parentElement);
-            return { tagName, attributes, parent: { element: sParent, childIndex } };
+            return { tagName, attributes, textContent, parent: { element: sParent, childIndex } };
         } else {
-            return { tagName, attributes };
+            return { tagName, attributes, textContent };
         }
     }
 
@@ -46,8 +48,9 @@ export class ClientTraceTracker {
     }
 
     public addEvent(eventType: string, target: HTMLElement, manualLabel?: string): void {
+        const textContent = target.textContent;
         const sTarget = ClientTraceTracker.serializeElement(target);
-        const payload: ICTTTransitionData = { eventType, manualLabel, target: sTarget };
+        const payload: ICTTTransitionData = { eventType, manualLabel, textContent, target: sTarget };
 
         const previousState = this.currentState;
         this.currentState = this.fsm.addState({});
@@ -62,6 +65,6 @@ export class ClientTraceTracker {
         this.sdbBinding = new SDBBinding(this.sdbDoc, [clientID], this.fsm);
 
         this.currentState = this.fsm.addState({});
-        this.fsm.addTransition(this.fsm.getStartState(), this.currentState);
+        this.fsm.addTransition(this.fsm.getStartState(), this.currentState, undefined, { eventType: '(start)', target: null, textContent: null});
     }
 }

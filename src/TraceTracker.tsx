@@ -1,9 +1,9 @@
 import { keys } from 'lodash';
 import * as React from 'react';
 import { SDBClient, SDBDoc } from 'sdb-ts';
+import { SDBBinding } from 't2sm/built/bindings/sharedb_binding';
 import { FSMView } from './FSMView';
 // import { FSM } from 't2sm';
-// import { SDBBinding } from 't2sm/built/bindings/sharedb_binding';
 
 interface ITraceTrackerProps {
     server: string;
@@ -14,7 +14,9 @@ interface ITraceTrackerState {
 
 export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrackerState> {
     private client: SDBClient;
-    private doc: SDBDoc<any>;
+    private tracesDoc: SDBDoc<any>;
+    private generatedFSMsDoc: SDBDoc<any>;
+    private traceTreeBinding: SDBBinding;
 
     public constructor(props: ITraceTrackerProps) {
         super(props);
@@ -22,18 +24,21 @@ export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrac
             userIDs: []
         }
         this.client = new SDBClient(new WebSocket(this.props.server));
-        this.doc = this.client.get('t2sm', 'userTraces');
-        this.doc.subscribe(this.onUserTracesUpdate);
+        this.tracesDoc = this.client.get('t2sm', 'userTraces');
+        this.tracesDoc.subscribe(this.onUserTracesUpdate);
+        this.generatedFSMsDoc = this.client.get('t2sm', 'generatedFSMs');
+        this.generatedFSMsDoc.subscribe();
     }
 
     public render(): React.ReactNode {
         const userIDDisplays: React.ReactNode[] = this.state.userIDs.map((uid) => {
             return (<div key={uid}>
                 {uid}:
-                <FSMView doc={this.doc} path={[uid]} />
+                <FSMView doc={this.tracesDoc} path={[uid]} />
             </div>);
         });
         return <div>
+            <FSMView doc={this.generatedFSMsDoc} path={['traceTree']} />
             {userIDDisplays}
         </div>;
     }
@@ -52,7 +57,7 @@ export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrac
     }
 
     private updateUserIDs(): void {
-        const data = this.doc.getData();
+        const data = this.tracesDoc.getData();
         const userIDs = keys(data);
         this.setState({ userIDs });
     }

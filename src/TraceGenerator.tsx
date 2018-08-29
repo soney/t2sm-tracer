@@ -27,6 +27,9 @@ export class TraceGenerator extends React.Component<ITraceGeneratorProps, ITrace
     public render(): React.ReactNode {
         return <div>
             <button onClick={this.btnClick}>Button 1</button>
+            <button onClick={this.btnClick}>Button 2</button>
+            <button onClick={this.btnClick}>Button 3</button>
+            <button onClick={this.btnClick}>Button 4</button>
         </div>;
     }
 

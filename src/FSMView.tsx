@@ -2,6 +2,7 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { SDBDoc, SDBSubDoc } from 'sdb-ts';
 import { FSM, SDBBinding } from 't2sm';
+import { ForeignObjectDisplay } from 't2sm/built/views/ForeignObjectDisplay';
 import { StateMachineDisplay } from 't2sm/built/views/StateMachineDisplay';
 import { DISPLAY_TYPE } from 't2sm/built/views/StateMachineDisplay';
 
@@ -19,13 +20,12 @@ export class FSMView extends React.Component<IStateMachineDisplayProps, IStateMa
     private stateMachineDisplay: StateMachineDisplay;
     private binding: SDBBinding;
     private fsm: FSM<any, any>;
+    private docFetchPromise: Promise<any>;
 
     public constructor(props: IStateMachineDisplayProps) {
         super(props);
-        this.binding = new SDBBinding(this.props.doc, this.props.path);
-        this.fsm = this.binding.getFSM();
-        this.state = {
-        };
+        this.docFetchPromise = this.props.doc.fetch();
+        this.state = { };
     }
 
     public render(): React.ReactNode {
@@ -36,7 +36,25 @@ export class FSMView extends React.Component<IStateMachineDisplayProps, IStateMa
 
     private divRef = (el: HTMLDivElement): void => {
         if (el) {
-            const display = new StateMachineDisplay(this.fsm, el);
+            this.docFetchPromise.then(() => {
+                this.binding = new SDBBinding(this.props.doc, this.props.path);
+                this.fsm = this.binding.getFSM();
+                const display = new StateMachineDisplay(this.fsm, el , (fod: ForeignObjectDisplay) => {
+                    const payload = fod.getPayload();
+                    if(fod.getDisplayType() === DISPLAY_TYPE.STATE) {
+                        return '';
+                    } else {
+                        const { eventType, data, textContent, target, transitions } = payload;
+                        if (transitions) {
+                            return `${data.eventType} ${data.textContent}`;
+                        } else if (target) {
+                            return `${eventType} ${textContent}`;
+                        } else {
+                            return `${eventType}`;
+                        }
+                    }
+                });
+            });
         }
     }
 } 

@@ -33,8 +33,9 @@ export class TraceTrackerServer {
         this.outputDoc = this.sdbServer.get('t2sm', 'generatedFSMs');
         this.outputDoc.createIfEmpty({
             'traceTree': {}
+        }).then(() => {
+            this.traceTreeBinding = new SDBBinding(this.outputDoc, ['traceTree'], this.ttsm.getTraceTree());
         });
-        this.traceTreeBinding = new SDBBinding(this.outputDoc, ['traceTree'], this.ttsm.getTraceTree());
     }
 
     public listen(): void {
