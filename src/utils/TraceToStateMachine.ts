@@ -136,6 +136,8 @@ export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:st
     const mergeIntoOutgoingTransitions = fsm.getOutgoingTransitions(mergeInto);
     const outgoingTransitionTargets = new Set<string>();
 
+    console.log(`Merge ${removeState} into ${mergeInto}:\n${fsm.toString()}`);
+
     let outgoingTransitions: string[];
 
     do {
@@ -181,12 +183,20 @@ export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:st
     fsm.removeState(removeState);
 
     if (removeStaleStates) {
-        outgoingTransitionTargets.forEach((state) => {
-            if (fsm.getIncomingTransitions(state).length === 0) {
-                fsm.removeState(state);
+        while (true) {
+            let removedAny: boolean = false;
+            outgoingTransitionTargets.forEach((state) => {
+                if (fsm.getIncomingTransitions(state).length === 0) {
+                    fsm.removeState(state);
+                    removedAny = true;
+                }
+            });
+            if (!removedAny) {
+                break;
             }
-        });
+        }
     }
+    console.log(`${fsm.toString()}`);
 }
 
 function condenseFSM(fsm: FSM<any, any>, transitionsEqual: EqualityCheck<any>, scoreSimilarity: SimilarityScore<any>): void {
@@ -200,7 +210,7 @@ function condenseFSM(fsm: FSM<any, any>, transitionsEqual: EqualityCheck<any>, s
  * Iterate and merge the best candidates
  */
 function iterateMerge(fsm: FSM<any, any>, minThreshold: number, transitionsEqual: EqualityCheck<any>, scoreSimilarity: SimilarityScore<any>): boolean {
-    const similarityScores = computeSimilarityScores(fsm, scoreSimilarity);
+    const similarityScores = computeSimilarityScores(fsm, 2, scoreSimilarity);
     const sortedStates = Array.from(similarityScores.entries()).sort((a, b) => b[1]-a[1]);
 
     if(sortedStates.length > 0) {
@@ -260,9 +270,8 @@ function getTransitionSimilarityScores(fsm: FSM<any, any>, transitionPairs: Arra
 /**
  * Compute a similarity score of every pair of states
  */
-function computeSimilarityScores(fsm: FSM<any, any>, scoreSimilarity: SimilarityScore<any>):HashMap<Pair<string>, number> {
+function computeSimilarityScores(fsm: FSM<any, any>, numStateCheckRounds: number, scoreSimilarity: SimilarityScore<any>):HashMap<Pair<string>, number> {
     const outgoingTransitionSimilarityScores = new HashMap<Pair<string>, number>(pairEqNoOrdering, hashPairNoOrdering);
-    const rv = new HashMap<Pair<string>, number>(pairEqNoOrdering, hashPairNoOrdering);
     const transitionPairs = getTransitionPairs(fsm);
     const transitionSimilarityScores = getTransitionSimilarityScores(fsm, transitionPairs, scoreSimilarity);
     transitionSimilarityScores.entries().forEach(([[t1, t2], score]) => {
@@ -273,19 +282,30 @@ function computeSimilarityScores(fsm: FSM<any, any>, scoreSimilarity: Similarity
             outgoingTransitionSimilarityScores.set(p, (outgoingTransitionSimilarityScores.get(p, 0) as number) + score);
         }
     });
-    transitionSimilarityScores.entries().forEach(([[t1, t2], score]) => {
-        const t1From = fsm.getTransitionFrom(t1);
-        const t1To = fsm.getTransitionTo(t1);
-        const t2From = fsm.getTransitionFrom(t2);
-        const t2To = fsm.getTransitionTo(t2);
 
-        if(t1From !== t2From) {
-            const p: [string, string] = [t1From, t2From];
-            const toSimilarity = outgoingTransitionSimilarityScores.get([t1To, t2To], 0) as number;
-            rv.set(p, (rv.get(p, 0) as number) + score + toSimilarity);
-        }
-    });
-    return rv;
+    let previousSimilarityScores: HashMap<Pair<string>, number> = outgoingTransitionSimilarityScores.clone();
+    let newSimilarityScores: HashMap<Pair<string>, number> = previousSimilarityScores;
+
+    outgoingTransitionSimilarityScores.clear();
+
+    for(let i: number = 0; i<numStateCheckRounds; i++) {
+        newSimilarityScores = new HashMap<Pair<string>, number>(pairEqNoOrdering, hashPairNoOrdering);
+        transitionSimilarityScores.entries().forEach(([[t1, t2], score]) => {
+            const t1From = fsm.getTransitionFrom(t1);
+            const t1To = fsm.getTransitionTo(t1);
+            const t2From = fsm.getTransitionFrom(t2);
+            const t2To = fsm.getTransitionTo(t2);
+
+            if(t1From !== t2From) {
+                const p: [string, string] = [t1From, t2From];
+                const toSimilarity = previousSimilarityScores.get([t1To, t2To], 0) as number;
+                newSimilarityScores.set(p, (previousSimilarityScores.get(p, 0) as number) + score + toSimilarity);
+            }
+        });
+        previousSimilarityScores.clear();
+        previousSimilarityScores = newSimilarityScores;
+    }
+    return newSimilarityScores;
     // const numCommonTransitions = new HashMap<Pair<string>, number>(pairEq, (p) => p[0] + p[1]);
     // const statePairs = getStatePairs(fsm);
     // const equivalentOutgoingTransitions:Map<Pair<string>, Array<Pair<string>>> = new Map<Pair<string>, Array<Pair<string>>>();

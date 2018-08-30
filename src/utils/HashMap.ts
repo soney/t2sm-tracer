@@ -110,4 +110,12 @@ export class HashMap<K, V> {
         this.size = 0;
         return this;
     };
+
+    public clone(): HashMap<K, V> {
+        const rv = new HashMap<K, V>(this.equals, this.hash);
+        this.entries().forEach(([k, v]) => {
+            rv.set(k, v);
+        })
+        return rv;
+    };
 };
