@@ -34,27 +34,34 @@ export class TraceGenerator extends React.Component<ITraceGeneratorProps, ITrace
     }
 
     private divRef = (el: HTMLDivElement) : void => {
-        setTimeout(async () => {
-            const buttons = document.getElementsByTagName("button");
-            return;
+        // setTimeout(async () => {
+        //     const buttons = document.getElementsByTagName("button");
 
-            this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
-            await this.traceTracker.ready;
-            buttons[0].click();
-            buttons[0].click();
-            this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
-            await this.traceTracker.ready;
-            buttons[0].click();
-            buttons[1].click();
-            this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
-            await this.traceTracker.ready;
-            buttons[1].click();
-            buttons[0].click();
-            this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
-            await this.traceTracker.ready;
-            buttons[1].click();
-            buttons[1].click();
-        }, 1000);
+        //     this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+        //     await this.traceTracker.ready;
+        //     buttons[0].click();
+        //     buttons[0].click();
+        //     this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+        //     await this.traceTracker.ready;
+        //     buttons[0].click();
+        //     buttons[1].click();
+        //     this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+        //     await this.traceTracker.ready;
+        //     buttons[1].click();
+        //     buttons[0].click();
+        //     this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+        //     await this.traceTracker.ready;
+        //     buttons[1].click();
+        //     buttons[1].click();
+        //     this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+        //     await this.traceTracker.ready;
+        //     buttons[1].click();
+        //     buttons[2].click();
+        //     this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+        //     await this.traceTracker.ready;
+        //     buttons[0].click();
+        //     buttons[2].click();
+        // }, 1000);
     }
 
     private btnClick = (event: React.MouseEvent): void => {

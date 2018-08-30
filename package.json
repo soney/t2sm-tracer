@@ -21,7 +21,7 @@
     "build": "react-scripts-ts build",
     "test": "react-scripts-ts test --env=jsdom",
     "eject": "react-scripts-ts eject",
-    "server": "node --inspect . /node_modules/.bin/ts-node -O '{\"module\": \"commonjs\"}' src/server/TraceTrackerServer.ts"
+    "server": "node --inspect ./node_modules/.bin/ts-node -O '{\"module\": \"commonjs\"}' src/server/TraceTrackerServer.ts"
   },
   "devDependencies": {
     "@types/express": "^4.16.0",

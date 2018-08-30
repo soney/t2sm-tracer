@@ -11,6 +11,33 @@ export class HashMap<K, V> {
     ) {
 
     };
+    public keys(): K[] {
+        const keys: K[] = [];
+
+        Array.from(this.map.values()).forEach((v) => {
+            keys.push(...v.map(p => p[0]));
+        });
+
+        return keys;
+    };
+    public values(): V[] {
+        const values: V[] = [];
+
+        Array.from(this.map.values()).forEach((v) => {
+            values.push(...v.map(p => p[1]));
+        });
+
+        return values;
+    };
+    public entries(): Array<[K,V]> {
+        const items: Array<[K,V]> = [];
+
+        Array.from(this.map.values()).forEach((v) => {
+            items.push(...v);
+        });
+
+        return items;
+    };
     public set(key:K, value:V):this {
         const hash = this.hash(key);
         if(this.map.has(hash)) {
