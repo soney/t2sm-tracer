@@ -6,8 +6,8 @@ import { SDBDoc, SDBServer } from 'sdb-ts';
 import { FSM } from 't2sm';
 import { SDBBinding } from 't2sm/built/bindings/sharedb_binding';
 import * as WebSocket from 'ws';
-import { ICTTStateData, ICTTTransitionData } from '../utils/ClientTraceTracker';
-import { TraceToStateMachine } from '../utils/TraceToStateMachine';
+import { ICTTStateData, ICTTTransitionData, ITraceTreeState, ITraceTreeTransition } from '../utils/FSMInterfaces';
+import { TraceToStateMachine } from './TraceToStateMachine';
 
 export class TraceTrackerServer {
     private app: express.Application;

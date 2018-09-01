@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { SDBClient, SDBDoc } from 'sdb-ts';
+import { FSMView } from './FSMView';
 import { ClientTraceTracker } from './utils/ClientTraceTracker';
 // import { FSM } from 't2sm';
 // import { SDBBinding } from 't2sm/built/bindings/sharedb_binding';
@@ -30,6 +31,7 @@ export class TraceGenerator extends React.Component<ITraceGeneratorProps, ITrace
             <button onClick={this.btnClick}>Button 2</button>
             <button onClick={this.btnClick}>Button 3</button>
             <button onClick={this.btnClick}>Button 4</button>
+            <FSMView fsm={this.traceTracker.getOutputFSM()} />
         </div>;
     }
 

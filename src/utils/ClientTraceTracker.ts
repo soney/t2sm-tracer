@@ -1,23 +1,9 @@
 import { SDBClient, SDBDoc } from 'sdb-ts';
 import { FSM } from 't2sm';
 import { SDBBinding } from 't2sm/built/bindings/sharedb_binding';
+import { cloneIntoFSM } from './cloneIntoFSM';
+import { ICTTStateData, ICTTTransitionData, ISerializedElement, ITraceTreeState, ITraceTreeTransition } from './FSMInterfaces';
 
-export interface ICTTStateData {
-    data?: any
-};
-export interface ICTTTransitionData {
-    eventType: string;
-    textContent: string | null;
-    target: ISerializedElement;
-    manualLabel?: string;
-};
-
-export interface ISerializedElement {
-    tagName: string;
-    textContent: string | null;
-    attributes: { [name: string]: string };
-    parent?: { element: ISerializedElement, childIndex: number }
-};
 
 export class ClientTraceTracker {
     private static serializeElement(el: HTMLElement): ISerializedElement {
@@ -39,7 +25,8 @@ export class ClientTraceTracker {
     public ready: Promise<void>;
 
     private fsm: FSM<ICTTStateData, ICTTTransitionData> = new FSM<ICTTStateData, ICTTTransitionData>();
-    private outputFSM: FSM<any, any>;
+    private outputFSM: FSM<ITraceTreeState, ITraceTreeTransition>;
+    private myOutputFSM: FSM<ITraceTreeState, ITraceTreeTransition> = new FSM();
     private ws: WebSocket;
     private sdbClient: SDBClient;
     private traceDoc: SDBDoc<any>;
@@ -49,7 +36,7 @@ export class ClientTraceTracker {
     private currentState: string;
 
 
-    public constructor(serverURL: string, clientID: string) {
+    public constructor(serverURL: string, private clientID: string) {
         this.ready = this.initialize(serverURL, clientID);
     }
 
@@ -62,13 +49,10 @@ export class ClientTraceTracker {
         this.currentState = this.fsm.addState({});
         this.fsm.addTransition(previousState, this.currentState, undefined, payload);
     }
+    public getOutputFSM(): FSM<ITraceTreeState, ITraceTreeTransition> { return this.myOutputFSM; };
 
     public destroy() {
         this.traceFSMBinding.destroy();
-    }
-
-    public getOutputFSM(): FSM<any, any> {
-        return this.outputFSM;
     }
 
     private async initialize(serverURL: string, clientID: string): Promise<void> {
@@ -85,5 +69,77 @@ export class ClientTraceTracker {
         await this.outputDoc.fetch();
         this.outputFSMBinding = new SDBBinding(this.outputDoc, ['outputFSM']);
         this.outputFSM = this.outputFSMBinding.getFSM();
+        this.outputFSM.on('stateAdded', this.updateMyOutputFSM);
+        this.outputFSM.on('stateRemoved', this.updateMyOutputFSM);
+        this.outputFSM.on('transitionAdded', this.updateMyOutputFSM);
+        this.outputFSM.on('transitionRemoved', this.updateMyOutputFSM);
+        this.outputFSM.on('transitionRenamed', this.updateMyOutputFSM);
+        this.outputFSM.on('statePayloadChanged', this.updateMyOutputFSM);
+        this.outputFSM.on('transitionAliasChanged', this.updateMyOutputFSM);
+        this.outputFSM.on('transitionPayloadChanged', this.updateMyOutputFSM);
+        this.outputFSM.on('transitionToStateChanged', this.updateMyOutputFSM);
+        this.outputFSM.on('transitionFromStateChanged', this.updateMyOutputFSM);
     }
+
+    private updateMyOutputFSM = (): void => {
+        cloneIntoFSM(this.outputFSM, this.myOutputFSM);
+        this.myOutputFSM.setActiveState(this.myOutputFSM.getStartState());
+
+        const visitedStates: Set<string> = new Set();
+        let traceActiveState: string = this.fsm.getStartState();
+        let moActiveState: string = this.myOutputFSM.getStartState();
+        do {
+            if(visitedStates.has(traceActiveState)) {
+                throw new Error(`Cycle detected with state ${traceActiveState}`);
+            } else {
+                visitedStates.add(traceActiveState);
+                const outgoingTransitions = this.fsm.getOutgoingTransitions(traceActiveState);
+                if(outgoingTransitions.length === 0) {
+                    break;
+                } else if(outgoingTransitions.length === 1) {
+                    const outgoingTransition = outgoingTransitions[0];
+                    const transitionPayload = this.fsm.getTransitionPayload(outgoingTransition);
+                    traceActiveState = this.fsm.getTransitionTo(outgoingTransition);
+
+                    const candidateOutgoingTransitions = this.myOutputFSM.getOutgoingTransitions(moActiveState);
+                    const candidatePayloads = candidateOutgoingTransitions.map((ot) => this.myOutputFSM.getTransitionPayload(ot) );
+                    const candidateIndex = this.getClosestTransitionMatch(outgoingTransition, transitionPayload, candidatePayloads);
+
+                    if (candidateIndex < 0) {
+                        break;
+                    } else {
+                        const selectedTransition = candidateOutgoingTransitions[candidateIndex];
+                        this.myOutputFSM.fireTransition(selectedTransition);
+                        moActiveState = this.myOutputFSM.getActiveState();
+                    }
+                } else {
+                    throw new Error(`More than 1 outgoing transition from state ${traceActiveState}`);
+                }
+            }
+        } while (true);
+    };
+
+    private getClosestTransitionMatch(targetName: string, targetPayload: ICTTTransitionData, candidatePayloads: ITraceTreeTransition[]): number {
+        for(let i: number = 0; i<candidatePayloads.length; i++) {
+            const candidatePayload = candidatePayloads[i];
+            const { transitions } = candidatePayload;
+            console.log(transitions);
+            console.log(this.clientID, targetName);
+            console.log(transitions.hasOwnProperty(this.clientID), transitions[this.clientID] === targetName);
+            /* tslint:disable: no-debugger */
+            // debugger;
+            if (transitions.hasOwnProperty(this.clientID) && transitions[this.clientID] === targetName) {
+                console.log(i);
+                return i;
+            }
+            // const { data } = candidatePayload;
+            // if (data.eventType === targetPayload.eventType) {
+            //     if (data.eventType === '(none)') {
+            //         console.log(i);
+            //         return i;
+            //     }
+            // }
+        }
+        return -1;
+    };
 }

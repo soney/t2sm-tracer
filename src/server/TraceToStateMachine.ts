@@ -1,16 +1,9 @@
 /* tslint:disable:prefer-for-of */
 import { extend, isEqual } from 'lodash';
 import { FSM } from 't2sm';
-import { ICTTStateData, ICTTTransitionData } from './ClientTraceTracker';
+import { cloneIntoFSM } from '../utils/cloneIntoFSM';
+import { ICTTStateData, ICTTTransitionData, ITraceTreeState, ITraceTreeTransition } from '../utils/FSMInterfaces';
 import { HashMap } from './HashMap';
-
-export interface ITraceTreeState {
-    states: { [userID: string]: string };
-}
-export interface ITraceTreeTransition {
-    transitions: { [userID: string]: string };
-    data: ICTTTransitionData;
-}
 
 
 export class TraceToStateMachine {
@@ -81,6 +74,9 @@ export class TraceToStateMachine {
                             closestTransition = ttot;
                             const newPayloadTransitions = extend({}, payload.transitions);
                             newPayloadTransitions[userID] = outgoingTransition;
+                            const newTransitionPayload = extend({}, payload, { transitions: newPayloadTransitions }) as ITraceTreeTransition;
+                            this.traceTree.setTransitionPayload(outgoingTransition, newTransitionPayload);
+
                             break;
                         }
                     }
@@ -132,11 +128,12 @@ function defaultSimilarityScore (a: any, b: any): number {
 /**
  * Merge two states together
  */
-export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:string, transitionsEqual: EqualityCheck<any>, removeStaleStates: boolean = true):void {
+export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:string, transitionsEqual: EqualityCheck<any>, getNewPayload: (rmPay: any, intPay: any) => any, removeStaleStates: boolean = true):void {
     const mergeIntoOutgoingTransitions = fsm.getOutgoingTransitions(mergeInto);
     const outgoingTransitionTargets = new Set<string>();
 
     console.log(`Merge ${removeState} into ${mergeInto}:\n${fsm.toString()}`);
+
 
     let outgoingTransitions: string[];
 
@@ -146,6 +143,8 @@ export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:st
             const t = outgoingTransitions[0];
             const tPayload = fsm.getTransitionPayload(t);
             let hasConflict: boolean = false;
+            let conflictingTransition: string = '';
+            let conflictingTransitionPayload: any;
 
             for (const i in mergeIntoOutgoingTransitions) {
                 if (mergeIntoOutgoingTransitions.hasOwnProperty(i)) {
@@ -154,6 +153,8 @@ export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:st
 
                     if (transitionsEqual(tPayload, t2Payload)) {
                         hasConflict = true;
+                        conflictingTransition = t2;
+                        conflictingTransitionPayload = t2Payload;
                         break;
                     }
                 }
@@ -163,6 +164,8 @@ export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:st
                 if (removeStaleStates) {
                     outgoingTransitionTargets.add(fsm.getTransitionTo(t));
                 }
+                const newTransitionPayload = getNewPayload(conflictingTransitionPayload, tPayload);
+                fsm.setTransitionPayload(conflictingTransition, newTransitionPayload);
                 fsm.removeTransition(t);
             } else {
                 fsm.setTransitionFrom(t, mergeInto);
@@ -179,6 +182,7 @@ export function mergeStates(fsm: FSM<any, any>, removeState:string, mergeInto:st
             fsm.setTransitionTo(t, mergeInto);
         }
     } while (incomingTransitions.length > 0);
+
 
     fsm.removeState(removeState);
 
@@ -217,7 +221,12 @@ function iterateMerge(fsm: FSM<any, any>, minThreshold: number, transitionsEqual
         const [toMergeS1, toMergeS2] = sortedStates[0][0];
         const score = sortedStates[0][1];
         if (score > minThreshold) {
-            mergeStates(fsm, toMergeS1, toMergeS2, transitionsEqual);
+            mergeStates(fsm, toMergeS1, toMergeS2, transitionsEqual, (removePayload: ITraceTreeTransition, mergeIntoPayload: ITraceTreeTransition) => {
+                const newTransitions = extend({}, removePayload.transitions, mergeIntoPayload.transitions);
+                const newPayload = extend({}, mergeIntoPayload, { transitions: newTransitions } );
+                console.log(newPayload.transitions);
+                return newPayload;
+            });
             return true;
         }
     }
@@ -353,19 +362,6 @@ function computeSimilarityScores(fsm: FSM<any, any>, numStateCheckRounds: number
 //     }
 //     return rv;
 // }
-
-function cloneIntoFSM(sourceFSM: FSM<any, any>, targetFSM: FSM<any, any>): void {
-    const states = targetFSM.getStates().filter(s => s !== targetFSM.getStartState());
-    states.forEach((s) => targetFSM.removeState(s));
-    const sourceStates = sourceFSM.getStates().filter(s => s !== sourceFSM.getStartState());
-    sourceStates.forEach((s) => {
-        targetFSM.addState(sourceFSM.getStatePayload(s), s);
-    });
-    const sourceTransitions = sourceFSM.getTransitions();
-    sourceTransitions.forEach((t) => {
-        targetFSM.addTransition(sourceFSM.getTransitionFrom(t), sourceFSM.getTransitionTo(t), sourceFSM.getTransitionAlias(t), sourceFSM.getTransitionPayload(t), t);
-    });
-}
 
 function pairEq(p1: any, p2: any): boolean {
     return p1[0] === p2[0] && p1[1] === p2[1];

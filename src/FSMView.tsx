@@ -7,8 +7,9 @@ import { StateMachineDisplay } from 't2sm/built/views/StateMachineDisplay';
 import { DISPLAY_TYPE } from 't2sm/built/views/StateMachineDisplay';
 
 interface IStateMachineDisplayProps {
-    path: Array<string|number>;
-    doc: SDBDoc<any>;
+    path?: Array<string|number>;
+    doc?: SDBDoc<any>;
+    fsm?: FSM<any, any>;
 }
 interface IStateMachineDisplayState {
     value? : any
@@ -19,12 +20,18 @@ export enum TransitionType { START, TIMEOUT, TOUCH_GROUP }
 export class FSMView extends React.Component<IStateMachineDisplayProps, IStateMachineDisplayState> {
     private stateMachineDisplay: StateMachineDisplay;
     private binding: SDBBinding;
-    private fsm: FSM<any, any>;
-    private docFetchPromise: Promise<any>;
+    private fsmPromise: Promise<FSM<any, any>>;
 
     public constructor(props: IStateMachineDisplayProps) {
         super(props);
-        this.docFetchPromise = this.props.doc.fetch();
+        if(this.props.doc && this.props.path) {
+            this.fsmPromise = this.props.doc.fetch().then(() => {
+                this.binding = new SDBBinding(this.props.doc as SDBDoc<any>, this.props.path as Array<string | number>);
+                return this.binding.getFSM();
+            });
+        } else {
+            this.fsmPromise = Promise.resolve(this.props.fsm as FSM<any, any>);
+        }
         this.state = { };
     }
 
@@ -36,10 +43,8 @@ export class FSMView extends React.Component<IStateMachineDisplayProps, IStateMa
 
     private divRef = (el: HTMLDivElement): void => {
         if (el) {
-            this.docFetchPromise.then(() => {
-                this.binding = new SDBBinding(this.props.doc, this.props.path);
-                this.fsm = this.binding.getFSM();
-                const display = new StateMachineDisplay(this.fsm, el , (fod: ForeignObjectDisplay) => {
+            this.fsmPromise.then((fsm: FSM<any, any>) => {
+                const display = new StateMachineDisplay(fsm, el , (fod: ForeignObjectDisplay) => {
                     const payload = fod.getPayload();
                     if(fod.getDisplayType() === DISPLAY_TYPE.STATE) {
                         return `${fod.getName()}`;
