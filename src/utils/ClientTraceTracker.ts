@@ -93,28 +93,28 @@ export class ClientTraceTracker {
                 throw new Error(`Cycle detected with state ${traceActiveState}`);
             } else {
                 visitedStates.add(traceActiveState);
-                const outgoingTransitions = this.fsm.getOutgoingTransitions(traceActiveState);
-                if(outgoingTransitions.length === 0) {
+            }
+            const outgoingTransitions = this.fsm.getOutgoingTransitions(traceActiveState);
+            if(outgoingTransitions.length === 0) {
+                break;
+            } else if(outgoingTransitions.length === 1) {
+                const outgoingTransition = outgoingTransitions[0];
+                const transitionPayload = this.fsm.getTransitionPayload(outgoingTransition);
+                traceActiveState = this.fsm.getTransitionTo(outgoingTransition);
+
+                const candidateOutgoingTransitions = this.myOutputFSM.getOutgoingTransitions(moActiveState);
+                const candidatePayloads = candidateOutgoingTransitions.map((ot) => this.myOutputFSM.getTransitionPayload(ot) );
+                const candidateIndex = this.getClosestTransitionMatch(outgoingTransition, transitionPayload, candidatePayloads);
+
+                if (candidateIndex < 0) {
                     break;
-                } else if(outgoingTransitions.length === 1) {
-                    const outgoingTransition = outgoingTransitions[0];
-                    const transitionPayload = this.fsm.getTransitionPayload(outgoingTransition);
-                    traceActiveState = this.fsm.getTransitionTo(outgoingTransition);
-
-                    const candidateOutgoingTransitions = this.myOutputFSM.getOutgoingTransitions(moActiveState);
-                    const candidatePayloads = candidateOutgoingTransitions.map((ot) => this.myOutputFSM.getTransitionPayload(ot) );
-                    const candidateIndex = this.getClosestTransitionMatch(outgoingTransition, transitionPayload, candidatePayloads);
-
-                    if (candidateIndex < 0) {
-                        break;
-                    } else {
-                        const selectedTransition = candidateOutgoingTransitions[candidateIndex];
-                        this.myOutputFSM.fireTransition(selectedTransition);
-                        moActiveState = this.myOutputFSM.getActiveState();
-                    }
                 } else {
-                    throw new Error(`More than 1 outgoing transition from state ${traceActiveState}`);
+                    const selectedTransition = candidateOutgoingTransitions[candidateIndex];
+                    this.myOutputFSM.fireTransition(selectedTransition);
+                    moActiveState = this.myOutputFSM.getActiveState();
                 }
+            } else {
+                throw new Error(`More than 1 outgoing transition from state ${traceActiveState}`);
             }
         } while (true);
     };
@@ -123,22 +123,9 @@ export class ClientTraceTracker {
         for(let i: number = 0; i<candidatePayloads.length; i++) {
             const candidatePayload = candidatePayloads[i];
             const { transitions } = candidatePayload;
-            console.log(transitions);
-            console.log(this.clientID, targetName);
-            console.log(transitions.hasOwnProperty(this.clientID), transitions[this.clientID] === targetName);
-            /* tslint:disable: no-debugger */
-            // debugger;
             if (transitions.hasOwnProperty(this.clientID) && transitions[this.clientID] === targetName) {
-                console.log(i);
                 return i;
             }
-            // const { data } = candidatePayload;
-            // if (data.eventType === targetPayload.eventType) {
-            //     if (data.eventType === '(none)') {
-            //         console.log(i);
-            //         return i;
-            //     }
-            // }
         }
         return -1;
     };
