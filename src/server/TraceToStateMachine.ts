@@ -217,6 +217,7 @@ function iterateMerge(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, minThresh
     const sortedStates = Array.from(similarityScores.entries()).sort((a, b) => b[1]-a[1]);
 
     if(sortedStates.length > 0) {
+        console.log(sortedStates);
         const [toMergeS1, toMergeS2] = sortedStates[0][0];
         const score = sortedStates[0][1];
         if (score > minThreshold) {

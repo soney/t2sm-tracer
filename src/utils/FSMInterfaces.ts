@@ -10,7 +10,6 @@ export interface ICTTStateData { };
 
 export interface ICTTTransitionData {
     eventType: string;
-    textContent: string | null;
     target: ISerializedElement;
     manualLabel?: string;
 };

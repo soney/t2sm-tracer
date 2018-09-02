@@ -41,9 +41,9 @@ export class ClientTraceTracker {
     }
 
     public addEvent(eventType: string, target: HTMLElement, manualLabel?: string): void {
-        const textContent = target.textContent;
+        const { textContent } = target;
         const sTarget = ClientTraceTracker.serializeElement(target);
-        const payload: ICTTTransitionData = { eventType, manualLabel, textContent, target: sTarget };
+        const payload: ICTTTransitionData = { eventType, manualLabel, target: sTarget };
 
         const previousState = this.currentState;
         this.currentState = this.fsm.addState({});
@@ -63,7 +63,7 @@ export class ClientTraceTracker {
         this.traceFSMBinding = new SDBBinding(this.traceDoc, [clientID], this.fsm);
 
         this.currentState = this.fsm.addState({});
-        this.fsm.addTransition(this.fsm.getStartState(), this.currentState, undefined, { eventType: '(start)', target: null, textContent: null});
+        this.fsm.addTransition(this.fsm.getStartState(), this.currentState, undefined, { eventType: '(start)', target: null });
 
         this.outputDoc = this.sdbClient.get('t2sm', 'generatedFSMs');
         await this.outputDoc.fetch();
