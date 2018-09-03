@@ -1,4 +1,3 @@
-/* tslint:disable:prefer-for-of */
 import { extend, isEqual } from 'lodash';
 import { FSM } from 't2sm';
 import { cloneIntoFSM } from '../utils/cloneIntoFSM';
@@ -126,11 +125,11 @@ function defaultSimilarityScore (a: any, b: any): number {
 /**
  * Merge two states together
  */
-export function mergeStates(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, removeState:string, mergeInto:string, transitionsEqual: EqualityCheck<any>, getNewPayload: (rmPay: ITraceTreeTransition, intPay: ITraceTreeTransition) => any, removeStaleStates: boolean = true):void {
+export function mergeStates(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, removeState:string, mergeInto:string):void {
     const mergeIntoOutgoingTransitions = fsm.getOutgoingTransitions(mergeInto);
     const outgoingTransitionTargets = new Set<string>();
 
-    console.log(`Merge ${removeState} into ${mergeInto}:\n${fsm.toString()}`);
+    // console.log(`Merge ${removeState} into ${mergeInto}:\n${fsm.toString()}`);
 
     let rmOutgoingTransitions: string[];
 
@@ -138,35 +137,7 @@ export function mergeStates(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, rem
         rmOutgoingTransitions = fsm.getOutgoingTransitions(removeState);
         if (rmOutgoingTransitions.length > 0) {
             const rmOutgoingTransition = rmOutgoingTransitions[0];
-            const tPayload = fsm.getTransitionPayload(rmOutgoingTransition);
-            let hasConflict: boolean = false;
-            let miConflictingTransition: string = '';
-            let miConflictingTransitionPayload: any;
-
-            for (const i in mergeIntoOutgoingTransitions) {
-                if (mergeIntoOutgoingTransitions.hasOwnProperty(i)) {
-                    const t2 = mergeIntoOutgoingTransitions[i];
-                    const t2Payload = fsm.getTransitionPayload(t2);
-
-                    if (transitionsEqual(tPayload.data, t2Payload.data)) {
-                        hasConflict = true;
-                        miConflictingTransition = t2;
-                        miConflictingTransitionPayload = t2Payload;
-                        break;
-                    }
-                }
-            }
-
-            if (hasConflict) {
-                if (removeStaleStates) {
-                    outgoingTransitionTargets.add(fsm.getTransitionTo(rmOutgoingTransition));
-                }
-                const newTransitionPayload = getNewPayload(miConflictingTransitionPayload, tPayload);
-                fsm.setTransitionPayload(miConflictingTransition, newTransitionPayload);
-                fsm.removeTransition(rmOutgoingTransition);
-            } else {
-                fsm.setTransitionFrom(rmOutgoingTransition, mergeInto);
-            }
+            fsm.setTransitionFrom(rmOutgoingTransition, mergeInto);
         }
     } while (rmOutgoingTransitions.length > 0);
 
@@ -180,26 +151,29 @@ export function mergeStates(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, rem
         }
     } while (incomingTransitions.length > 0);
 
-
     fsm.removeState(removeState);
+    // console.log(`${fsm.toString()}`);
+}
 
-    if (removeStaleStates) {
-        while (true) {
-            let removedState: string | null = null;
-            outgoingTransitionTargets.forEach((state) => {
-                if (fsm.getIncomingTransitions(state).length === 0) {
-                    fsm.removeState(state);
-                    removedState = state;
-                }
-            });
-            if (removedState === null) {
-                break;
-            } else {
-                outgoingTransitionTargets.delete(removedState);
+function removeStaleStates(fsm: FSM<ITraceTreeState, ITraceTreeTransition>) {
+    const candidates: Set<string> = new Set();
+    const startState = fsm.getStartState();
+    fsm.getStates().forEach((state) => {
+        if (state !== startState) { candidates.add(state); }
+    })
+    while (true) {
+        let removedState: string | null = null;
+        candidates.forEach((state) => {
+            if (fsm.getIncomingTransitions(state).length === 0) {
+                fsm.removeState(state);
+                removedState = state;
+                candidates.delete(removedState);
             }
+        });
+        if (removedState === null) {
+            break;
         }
     }
-    console.log(`${fsm.toString()}`);
 }
 
 function condenseFSM(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, transitionsEqual: EqualityCheck<ITraceTreeTransition>, scoreSimilarity: SimilarityScore<ITraceTreeTransition>): void {
@@ -207,6 +181,74 @@ function condenseFSM(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, transition
     do {
         hasMerged = iterateMerge(fsm, 2, transitionsEqual, scoreSimilarity);
     } while (hasMerged);
+
+    const mergePayloads = (removePayload: ITraceTreeTransition, mergeIntoPayload: ITraceTreeTransition) => {
+        const newTransitions = extend({}, removePayload.transitions, mergeIntoPayload.transitions);
+        const newPayload = extend({}, mergeIntoPayload, { transitions: newTransitions } );
+        return newPayload;
+    }
+    // Remove conflicting transitions
+    fsm.getStates().forEach((state) => {
+        removeConflictingTransitions(fsm, state, transitionsEqual, mergePayloads);
+    });
+    removeStaleStates(fsm);
+}
+
+function removeConflictingTransitions(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, state: string, transitionsEqual: EqualityCheck<any>, getNewPayload: (rmPay: ITraceTreeTransition, intPay: ITraceTreeTransition) => any):void {
+    let outgoingTransitions: string[] = fsm.getOutgoingTransitions(state);
+    let numOutgoingTransitions: number = outgoingTransitions.length;
+    for(let i: number = 0; i < numOutgoingTransitions; i++) {
+        const oti = outgoingTransitions[i];
+        const otiPayload = fsm.getTransitionPayload(oti);
+        const equalTransitions: string[] = [oti];
+        for(let j: number = i+1; j < numOutgoingTransitions; j++) {
+            const otj = outgoingTransitions[j];
+            const otjPayload = fsm.getTransitionPayload(otj);
+            if(transitionsEqual(otiPayload.data, otjPayload.data)) {
+                equalTransitions.push(otj);
+            }
+        }
+        if (equalTransitions.length > 1) {
+            const destinationsMap = new Map();
+            let mostFrequentDestination: string;
+
+            equalTransitions.forEach((t) => {
+                const destination = fsm.getTransitionTo(t);
+                const prevValue = destinationsMap.has(destination) ? destinationsMap.get(destination) : 0;
+                destinationsMap.set(destination, prevValue + 1);
+            });
+
+            let mergeIntoIndex: number = 0; 
+            if (destinationsMap.size > 1) {
+                const destinationFrequencies = Array.from(destinationsMap.entries());
+                const sortedDF = destinationFrequencies.sort((a, b) => b[1]-a[1]);
+                mostFrequentDestination = sortedDF[0][0];
+
+                for(let x: number = 0; x < equalTransitions.length; x++) {
+                    if (fsm.getTransitionTo(equalTransitions[x]) === mostFrequentDestination) {
+                        mergeIntoIndex = x;
+                        break;
+                    }
+                }
+            } else {
+                mostFrequentDestination = Array.from(destinationsMap.keys())[0];
+            }
+
+            const mergeIntoTransition = equalTransitions[mergeIntoIndex];
+            equalTransitions.forEach((t) => {
+                if (t !== mergeIntoTransition) {
+                    const rmPayload = fsm.getTransitionPayload(t);
+                    const miPayload = fsm.getTransitionPayload(mergeIntoTransition);
+                    fsm.setTransitionPayload(mergeIntoTransition, getNewPayload(rmPayload, miPayload));
+                    fsm.removeTransition(t);
+                }
+            });
+
+            outgoingTransitions = fsm.getOutgoingTransitions(state);
+            numOutgoingTransitions = outgoingTransitions.length;
+            i--;
+        }
+    }
 }
 
 /**
@@ -217,15 +259,11 @@ function iterateMerge(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, minThresh
     const sortedStates = Array.from(similarityScores.entries()).sort((a, b) => b[1]-a[1]);
 
     if(sortedStates.length > 0) {
-        console.log(sortedStates);
+        // console.log(sortedStates);
         const [toMergeS1, toMergeS2] = sortedStates[0][0];
         const score = sortedStates[0][1];
         if (score > minThreshold) {
-            mergeStates(fsm, toMergeS1, toMergeS2, transitionsEqual, (removePayload: ITraceTreeTransition, mergeIntoPayload: ITraceTreeTransition) => {
-                const newTransitions = extend({}, removePayload.transitions, mergeIntoPayload.transitions);
-                const newPayload = extend({}, mergeIntoPayload, { transitions: newTransitions } );
-                return newPayload;
-            });
+            mergeStates(fsm, toMergeS1, toMergeS2);
             return true;
         }
     }

@@ -21,10 +21,10 @@ describe('Create a basic FSM', () => {
         }
     });
     const traces = [
-        ['1'],
-        ['1', '1'],
-        ['1', '1', '1'],
-        ['1', '1', '1', '1'],
+        ['2'],
+        ['1', '2'],
+        ['1', '1', '2'],
+        ['1', '1', '1', '2'],
     ]
     traces.forEach((trace, i) => {
         const fsm = createTraceFSM(trace);
