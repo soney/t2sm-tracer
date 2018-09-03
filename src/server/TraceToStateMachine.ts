@@ -205,7 +205,7 @@ export function mergeStates(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, rem
 function condenseFSM(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, transitionsEqual: EqualityCheck<ITraceTreeTransition>, scoreSimilarity: SimilarityScore<ITraceTreeTransition>): void {
     let hasMerged: boolean = true;
     do {
-        hasMerged = iterateMerge(fsm, 4, transitionsEqual, scoreSimilarity);
+        hasMerged = iterateMerge(fsm, 2, transitionsEqual, scoreSimilarity);
     } while (hasMerged);
 }
 
