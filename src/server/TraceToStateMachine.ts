@@ -179,7 +179,7 @@ function removeStaleStates(fsm: FSM<ITraceTreeState, ITraceTreeTransition>) {
 function condenseFSM(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, transitionsEqual: EqualityCheck<ITraceTreeTransition>, scoreSimilarity: SimilarityScore<ITraceTreeTransition>): void {
     let hasMerged: boolean = true;
     do {
-        hasMerged = iterateMerge(fsm, 2, transitionsEqual, scoreSimilarity);
+        hasMerged = iterateMerge(fsm, 6, transitionsEqual, scoreSimilarity);
     } while (hasMerged);
 
     const mergePayloads = (removePayload: ITraceTreeTransition, mergeIntoPayload: ITraceTreeTransition) => {
@@ -264,6 +264,15 @@ function iterateMerge(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, minThresh
         const score = sortedStates[0][1];
         if (score > minThreshold) {
             mergeStates(fsm, toMergeS1, toMergeS2);
+
+            const mergePayloads = (removePayload: ITraceTreeTransition, mergeIntoPayload: ITraceTreeTransition) => {
+                const newTransitions = extend({}, removePayload.transitions, mergeIntoPayload.transitions);
+                const newPayload = extend({}, mergeIntoPayload, { transitions: newTransitions } );
+                return newPayload;
+            }
+            // Remove conflicting transitions
+            removeConflictingTransitions(fsm, toMergeS2, transitionsEqual, mergePayloads);
+
             return true;
         }
     }

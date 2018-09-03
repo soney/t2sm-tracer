@@ -51,7 +51,11 @@ export class FSMView extends React.Component<IStateMachineDisplayProps, IStateMa
                     } else {
                         const { eventType, data, target, transitions } = payload;
                         if (transitions) {
-                            return `${data.eventType} ${data.target.textContent}`;
+                            if (data.target) {
+                                return `${data.eventType} ${data.target.textContent}`;
+                            } else {
+                                return `${data.eventType}`;
+                            }
                         } else if (target) {
                             return `${eventType} ${target.textContent}`;
                         } else {

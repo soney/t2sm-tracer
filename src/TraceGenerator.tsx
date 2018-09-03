@@ -23,6 +23,7 @@ export class TraceGenerator extends React.Component<ITraceGeneratorProps, ITrace
             userIDs: []
         }
         this.traceTracker = new ClientTraceTracker(this.props.server, `client_${Math.random()}`);
+        this.traceTracker.getOutputFSM();
     }
 
     public render(): React.ReactNode {
