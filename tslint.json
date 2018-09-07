@@ -4,11 +4,14 @@
         "exclude": [
             "config/**/*.js",
             "node_modules/**/*.ts",
-            "coverage/lcov-report/*.js"
+            "coverage/lcov-report/*.js",
+            "built/**/*.js",
+            "*.js"
         ]
     },
     "rules": {
         "no-console": false,
-        "no-debugger": false
+        "no-debugger": false,
+        "prefer-for-of": false
     }
 }

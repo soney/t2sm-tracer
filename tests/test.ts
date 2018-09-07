@@ -25,6 +25,9 @@ describe('Create a basic FSM', () => {
         ['1', '2'],
         ['1', '1', '2'],
         ['1', '1', '1', '2'],
+        ['1', '1', '1', '1', '2'],
+        ['1', '1', '1', '1', '1', '2'],
+        ['1', '1', '1', '1', '1', '1', '2'],
     ]
     traces.forEach((trace, i) => {
         const fsm = createTraceFSM(trace);
