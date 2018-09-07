@@ -69,6 +69,6 @@ export class TraceGenerator extends React.Component<ITraceGeneratorProps, ITrace
 
     private btnClick = (event: React.MouseEvent): void => {
         const target = event.target as HTMLElement;
-        this.traceTracker.addEvent('click', target);
+        this.traceTracker.addEvent('click', target, 'GROUP');
     };
 };

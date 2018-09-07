@@ -112,9 +112,13 @@ type Pair<E> = [E, E];
 export type EqualityCheck<E> = (i1:E, i2:E) => boolean;
 export type SimilarityScore<E> = (i1:E, i2:E) => number;
 
-function defaultEqualityCheck (a: any, b: any): boolean {
-    const eventTypesEqual = a.eventType === b.eventType;
-    return eventTypesEqual && isEqual(extend({}, a.target, { parent: null }), extend({}, b.target, { parent: null }));
+function defaultEqualityCheck (a: ICTTTransitionData, b: ICTTTransitionData): boolean {
+    if(a.manualLabel || b.manualLabel) {
+        return a.manualLabel === b.manualLabel;
+    } else {
+        const eventTypesEqual = a.eventType === b.eventType;
+        return eventTypesEqual && isEqual(extend({}, a.target, { parent: null }), extend({}, b.target, { parent: null }));
+    }
 }
 
 function defaultSimilarityScore (a: any, b: any): number {
@@ -176,7 +180,7 @@ function removeStaleStates(fsm: FSM<ITraceTreeState, ITraceTreeTransition>) {
     }
 }
 
-function condenseFSM(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, transitionsEqual: EqualityCheck<ITraceTreeTransition>, scoreSimilarity: SimilarityScore<ICTTTransitionData>): void {
+function condenseFSM(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, transitionsEqual: EqualityCheck<ICTTTransitionData>, scoreSimilarity: SimilarityScore<ICTTTransitionData>): void {
     let hasMerged: boolean = true;
     do {
         hasMerged = iterateMerge(fsm, 3, transitionsEqual, scoreSimilarity);
@@ -254,12 +258,12 @@ function removeConflictingTransitions(fsm: FSM<ITraceTreeState, ITraceTreeTransi
 /**
  * Iterate and merge the best candidates
  */
-function iterateMerge(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, minThreshold: number, transitionsEqual: EqualityCheck<ITraceTreeTransition>, scoreSimilarity: SimilarityScore<ICTTTransitionData>): boolean {
-    const similarityScores = computeSimilarityScores(fsm, 2, scoreSimilarity);
+function iterateMerge(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, minThreshold: number, transitionsEqual: EqualityCheck<ICTTTransitionData>, scoreSimilarity: SimilarityScore<ICTTTransitionData>): boolean {
+    const similarityScores = computeSimilarityScores(fsm, 4, 0.1, transitionsEqual, scoreSimilarity);
     const sortedStates = Array.from(similarityScores.entries()).sort((a, b) => b[1]-a[1]);
 
     if(sortedStates.length > 0) {
-        console.log(sortedStates);
+        // console.log(sortedStates);
         const [toMergeS1, toMergeS2] = sortedStates[0][0];
         const score = sortedStates[0][1];
         if (score > minThreshold) {
@@ -271,8 +275,9 @@ function iterateMerge(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, minThresh
                 return newPayload;
             }
             // Remove conflicting transitions
-            removeConflictingTransitions(fsm, toMergeS2, transitionsEqual, mergePayloads);
+            // removeConflictingTransitions(fsm, toMergeS2, transitionsEqual, mergePayloads);
 
+            // console.log(`${fsm.toString()}`);
             return true;
         }
     }
@@ -298,20 +303,20 @@ function getStatePairs(fsm: FSM<ITraceTreeState, ITraceTreeTransition>):Array<Pa
 /**
  * @returns every possible pairing of transitions
  */
-function getTransitionPairs(fsm: FSM<ITraceTreeState, ITraceTreeTransition>):Array<Pair<string>> {
-    const rv: Array<Pair<string>> = [];
-    const outgoingFromStartState = fsm.getOutgoingTransitions(fsm.getStartState());
-    // Exclude transition  from the start state
-    const transitions = fsm.getTransitions().filter((t) => outgoingFromStartState.indexOf(t) < 0);
-    for(let i:number = 0; i<transitions.length; i++) {
-        const ti = transitions[i];
-        for(let j:number = i+1; j<transitions.length; j++) {
-            const tj = transitions[j];
-            rv.push([ti, tj]);
-        }
-    }
-    return rv;
-}
+// function getTransitionPairs(fsm: FSM<ITraceTreeState, ITraceTreeTransition>):Array<Pair<string>> {
+//     const rv: Array<Pair<string>> = [];
+//     const outgoingFromStartState = fsm.getOutgoingTransitions(fsm.getStartState());
+//     // Exclude transition  from the start state
+//     const transitions = fsm.getTransitions().filter((t) => outgoingFromStartState.indexOf(t) < 0);
+//     for(let i:number = 0; i<transitions.length; i++) {
+//         const ti = transitions[i];
+//         for(let j:number = i+1; j<transitions.length; j++) {
+//             const tj = transitions[j];
+//             rv.push([ti, tj]);
+//         }
+//     }
+//     return rv;
+// }
 
 function getTransitionSimilarityScores(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, transitionPairs: Array<Pair<string>>, scoreSimilarity: SimilarityScore<ICTTTransitionData>): HashMap<Pair<string>, number> {
     const rv: HashMap<Pair<string>, number> = new HashMap(pairEq, (p) => p[0]+p[1]);
@@ -327,36 +332,42 @@ function getTransitionSimilarityScores(fsm: FSM<ITraceTreeState, ITraceTreeTrans
 /**
  * Compute a similarity score of every pair of states
  */
-function computeSimilarityScores(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, numStateCheckRounds: number, scoreSimilarity: SimilarityScore<ICTTTransitionData>):HashMap<Pair<string>, number> {
+function computeSimilarityScores(fsm: FSM<ITraceTreeState, ITraceTreeTransition>, numStateCheckRounds: number, unmatchedPunishment: number, transitionsEqual: EqualityCheck<ICTTTransitionData>, scoreSimilarity: SimilarityScore<ICTTTransitionData>):HashMap<Pair<string>, number> {
     const statePairs = getStatePairs(fsm);
     const equivalentOutgoingTransitions:Map<Pair<string>, Array<Pair<string>>> = new Map<Pair<string>, Array<Pair<string>>>();
+    const outgoingTransitionSimilarityScores = new HashMap<Pair<string>, number>(pairEqNoOrdering, hashPairNoOrdering);
+    const stateSimilarityScores = new HashMap<Pair<string>, number>(pairEqNoOrdering, hashPairNoOrdering);
     statePairs.forEach((p) => {
         const [state1, state2] = p;
-        const et:Array<Pair<string>> = equivalentTransitions(fsm, fsm.getOutgoingTransitions(state1), fsm.getOutgoingTransitions(state2), scoreSimilarity);
-        equivalentOutgoingTransitions.set(p, et);
-        numCommonTransitions.set(p, et.length);
+        let pairScore: number = 0;
+        const et:IEquivalentTransitionsResult = equivalentTransitions(fsm, fsm.getOutgoingTransitions(state1), fsm.getOutgoingTransitions(state2), transitionsEqual);
+        et.matchedTransitions.forEach(([t1, t2]) => {
+            const t1Payload = fsm.getTransitionPayload(t1);
+            const t2Payload = fsm.getTransitionPayload(t2);
+            pairScore += scoreSimilarity(t1Payload.data, t2Payload.data);
+            outgoingTransitionSimilarityScores.set([t1, t2], pairScore);
+        });
+        pairScore -= unmatchedPunishment * (et.unmatchedSet1Transitions.length + et.unmatchedSet2Transitions.length);
+        stateSimilarityScores.set(p, pairScore);
     });
 
-    const outgoingTransitionSimilarityScores = new HashMap<Pair<string>, number>(pairEqNoOrdering, hashPairNoOrdering);
-    const transitionPairs = getTransitionPairs(fsm);
-    const transitionSimilarityScores = getTransitionSimilarityScores(fsm, transitionPairs, scoreSimilarity);
-    transitionSimilarityScores.entries().forEach(([[t1, t2], score]) => {
-        const t1From = fsm.getTransitionFrom(t1);
-        const t2From = fsm.getTransitionFrom(t2);
-        if (t1From !== t2From) {
-            const p: [string, string] = [fsm.getTransitionFrom(t1), fsm.getTransitionFrom(t2)];
-            outgoingTransitionSimilarityScores.set(p, (outgoingTransitionSimilarityScores.get(p, 0) as number) + score);
-        }
-    });
+    // const transitionPairs = getTransitionPairs(fsm);
+    // const transitionSimilarityScores = getTransitionSimilarityScores(fsm, transitionPairs, scoreSimilarity);
+    // transitionSimilarityScores.entries().forEach(([[t1, t2], score]) => {
+    //     const t1From = fsm.getTransitionFrom(t1);
+    //     const t2From = fsm.getTransitionFrom(t2);
+    //     if (t1From !== t2From) {
+    //         const p: [string, string] = [fsm.getTransitionFrom(t1), fsm.getTransitionFrom(t2)];
+    //         outgoingTransitionSimilarityScores.set(p, (outgoingTransitionSimilarityScores.get(p, 0) as number) + score);
+    //     }
+    // });
 
-    let previousSimilarityScores: HashMap<Pair<string>, number> = outgoingTransitionSimilarityScores.clone();
+    let previousSimilarityScores: HashMap<Pair<string>, number> = stateSimilarityScores.clone();
     let newSimilarityScores: HashMap<Pair<string>, number> = previousSimilarityScores;
-
-    outgoingTransitionSimilarityScores.clear();
 
     for(let i: number = 0; i<numStateCheckRounds; i++) {
         newSimilarityScores = new HashMap<Pair<string>, number>(pairEqNoOrdering, hashPairNoOrdering);
-        transitionSimilarityScores.entries().forEach(([[t1, t2], score]) => {
+        outgoingTransitionSimilarityScores.entries().forEach(([[t1, t2]]) => {
             const t1From = fsm.getTransitionFrom(t1);
             const t1To = fsm.getTransitionTo(t1);
             const t2From = fsm.getTransitionFrom(t2);
@@ -365,12 +376,15 @@ function computeSimilarityScores(fsm: FSM<ITraceTreeState, ITraceTreeTransition>
             if(t1From !== t2From) {
                 const p: [string, string] = [t1From, t2From];
                 const toSimilarity = previousSimilarityScores.get([t1To, t2To], 0) as number;
-                newSimilarityScores.set(p, (previousSimilarityScores.get(p, 0) as number) + score + toSimilarity);
+                newSimilarityScores.set(p, (previousSimilarityScores.get(p, 0) as number) + toSimilarity);
             }
         });
         previousSimilarityScores.clear();
         previousSimilarityScores = newSimilarityScores;
     }
+
+    outgoingTransitionSimilarityScores.clear();
+
     return newSimilarityScores;
 }
 
@@ -394,23 +408,41 @@ function hashPairNoOrdering(p: [string, string]): string {
     }
 }
 
+interface IEquivalentTransitionsResult {
+    matchedTransitions: Array<Pair<string>>;
+    unmatchedSet1Transitions: string[];
+    unmatchedSet2Transitions: string[];
+}
 /**
  * Get a list of equivalent transitions from two sets of transitions
  * @param transitionSet1 The first set of transitions
  * @param transitionSet2 The second set of transitions
  * @returns A list of pairs of transitions that are common between transitionSet1 and transitionSet2
  */
-function equivalentTransitions(fsm: FSM<any, any>, transitionSet1:string[], transitionSet2:string[], transitionsEqual: EqualityCheck<any> ):Array<Pair<string>> {
-    const rv:Array<Pair<string>> = [];
+function equivalentTransitions(fsm: FSM<any, any>, transitionSet1:string[], transitionSet2:string[], transitionsEqual: EqualityCheck<any> ):IEquivalentTransitionsResult {
+    const unmatchedSet1Transitions: Set<string> = new Set();
+    const unmatchedSet2Transitions: Set<string> = new Set();
+    transitionSet1.forEach((t) => unmatchedSet1Transitions.add(t));
+    transitionSet2.forEach((t) => unmatchedSet1Transitions.add(t));
+
+    const matchedTransitions:Array<Pair<string>> = [];
     for(let i:number = 0; i<transitionSet1.length; i++) {
         const t1 = transitionSet1[i];
         for(let j:number = 0; j<transitionSet2.length; j++) {
             const t2 = transitionSet2[j];
-            if(transitionsEqual(fsm.getTransitionPayload(t1), fsm.getTransitionPayload(t2))) {
-                rv.push([t1, t2]);
+            if(unmatchedSet2Transitions.has(t2)) {
+                continue;
+            } else if(transitionsEqual(fsm.getTransitionPayload(t1).data, fsm.getTransitionPayload(t2).data)) {
+                matchedTransitions.push([t1, t2]);
+                unmatchedSet1Transitions.delete(t1);
+                unmatchedSet2Transitions.delete(t2);
                 break;
             }
         }
     }
-    return rv;
+    return {
+        matchedTransitions,
+        unmatchedSet1Transitions: Array.from(unmatchedSet1Transitions.values()),
+        unmatchedSet2Transitions: Array.from(unmatchedSet2Transitions.values()),
+    };
 };
