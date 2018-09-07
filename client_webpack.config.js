@@ -15,7 +15,7 @@ module.exports = {
     },
     output: {
         filename: 'client_bundle.js',
-        path: path.resolve(__dirname, 'built')
+        path: path.resolve(__dirname, 'build')
     },
     externals: {
         't2sm': 't2sm'
