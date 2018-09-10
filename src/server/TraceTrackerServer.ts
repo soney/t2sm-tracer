@@ -27,6 +27,15 @@ export class TraceTrackerServer {
 
         this.server = http.createServer(this.app);
         this.wss = new WebSocket.Server({ server: this.server });
+        this.wss.on('connection', (ws) => {
+            ws.on('message', (message) => {
+                if(message === 'save') {
+                    this.saveCurrentTraces();
+                } else if(message === 'load') {
+                    this.readSavedTraces();
+                }
+            });
+        });
         this.sdbServer = new SDBServer(this.wss);
         this.inputDoc = this.sdbServer.get('t2sm', 'userTraces');
         this.inputDoc.createIfEmpty({});
@@ -56,7 +65,7 @@ export class TraceTrackerServer {
         });
     }
 
-    public readTraces(filename: string = 'traces.json'): Promise<void> {
+    public readSavedTraces(filename: string = 'traces.json'): Promise<void> {
         return new Promise<void> ((resolve, reject) => {
             fs.readFile(filename, 'utf8', (err, stringifiedData) => {
                 if (err) {

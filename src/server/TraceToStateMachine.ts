@@ -29,6 +29,20 @@ export class TraceToStateMachine {
 
     public removeUserFSM(userID: string): void {
         this.traceFSMs.delete(userID);
+        // this.updateTraceTree(userID);
+        this.traceTree.getStates().forEach((s) => {
+            if(s !== this.traceTree.getStartState()) {
+                this.traceTree.removeState(s);
+            }
+        })
+        // this.traceTree.destroy();
+        // this.traceTree = new FSM();
+        const userIDs = Array.from(this.traceFSMs.keys());
+        userIDs.forEach((uid) => {
+            this.updateTraceTree(uid);
+        });
+        cloneIntoFSM(this.traceTree, this.outputFSM);
+        condenseFSM(this.outputFSM, this.transitionsEqual, this.similarityScore);
     }
 
     public getTraceTree(): FSM<ITraceTreeState, ITraceTreeTransition> {

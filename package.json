@@ -11,7 +11,7 @@
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
     "react-scripts-ts": "2.17.0",
-    "sdb-ts": "^0.2.4",
+    "sdb-ts": "^0.2.5",
     "svg.js": "^2.6.5",
     "svg.pathmorphing.js": "^0.1.3",
     "t2sm": "0.0.6",

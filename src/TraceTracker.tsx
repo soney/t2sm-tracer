@@ -17,13 +17,15 @@ export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrac
     private tracesDoc: SDBDoc<any>;
     private generatedFSMsDoc: SDBDoc<any>;
     private traceTreeBinding: SDBBinding;
+    private ws: WebSocket;
 
     public constructor(props: ITraceTrackerProps) {
         super(props);
         this.state = {
             userIDs: []
         }
-        this.client = new SDBClient(new WebSocket(this.props.server));
+        this.ws = new WebSocket(this.props.server);
+        this.client = new SDBClient(this.ws);
         this.tracesDoc = this.client.get('t2sm', 'userTraces');
         this.tracesDoc.subscribe(this.onUserTracesUpdate);
         this.generatedFSMsDoc = this.client.get('t2sm', 'generatedFSMs');
@@ -33,11 +35,13 @@ export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrac
     public render(): React.ReactNode {
         const userIDDisplays: React.ReactNode[] = this.state.userIDs.map((uid) => {
             return (<div key={uid}>
-                <h2>{uid}</h2>
+                <h2>{uid} <button onClick={this.deleteTrace.bind(this, uid)}>Delete</button></h2>
                 <FSMView doc={this.tracesDoc} path={[uid]} />
             </div>);
         });
         return <div>
+            <button onClick={this.signalSave}>Save Traces</button>
+            <button onClick={this.signalLoad}>Load Traces</button>
             <h1>Output</h1>
             <FSMView doc={this.generatedFSMsDoc} path={['outputFSM']} />
             <h1>Traces</h1>
@@ -64,4 +68,15 @@ export class TraceTracker extends React.Component<ITraceTrackerProps, ITraceTrac
         const userIDs = keys(data);
         this.setState({ userIDs });
     }
+
+    private deleteTrace(uid: string) {
+        this.tracesDoc.submitObjectDeleteOp([uid]);
+    }
+
+    private signalSave = (): void => {
+        this.ws.send('save');
+    };
+    private signalLoad = (): void => {
+        this.ws.send('load');
+    };
 };
