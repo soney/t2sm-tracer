@@ -8,7 +8,7 @@ import { TraceTracker } from './TraceTracker';
 
 ReactDOM.render(
     <div>
-        <TraceGenerator server='ws://localhost:8000' />
+        {/* <TraceGenerator server='ws://localhost:8000' /> */}
         <TraceTracker server='ws://localhost:8000' />
     </div>,
     document.getElementById('root') as HTMLElement
