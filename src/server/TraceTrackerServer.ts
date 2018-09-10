@@ -1,11 +1,12 @@
 import * as express from 'express';
 import * as fs from 'fs';
 import * as http from 'http';
-import { keys } from 'lodash';
+import { each, keys } from 'lodash';
 import * as path from 'path';
 import { SDBDoc, SDBServer } from 'sdb-ts';
 import { FSM } from 't2sm';
 import { SDBBinding } from 't2sm/built/bindings/sharedb_binding';
+import { SerializedFSM } from 't2sm/built/state_machine/FSM';
 import * as WebSocket from 'ws';
 import { ICTTStateData, ICTTTransitionData, ITraceTreeState, ITraceTreeTransition } from '../utils/FSMInterfaces';
 import { TraceToStateMachine } from './TraceToStateMachine';
@@ -71,8 +72,12 @@ export class TraceTrackerServer {
                 if (err) {
                     reject(err);
                 } else {
-                    const data = JSON.parse(stringifiedData);
-                    this.ttsm.loadSerializedTraces(data);
+                    const traces = JSON.parse(stringifiedData);
+
+                    each(traces, (trace: SerializedFSM, uid: string) => {
+                        const fsm: FSM<ICTTStateData, ICTTTransitionData> = FSM.deserialize(trace);
+                        this.addUserFSM(uid, fsm);
+                    });
                     resolve();
                 }
             });
@@ -84,8 +89,8 @@ export class TraceTrackerServer {
         console.log(`Listening on port ${this.port}`);
     }
 
-    private addUserFSM(userID: string): void {
-        const binding = new SDBBinding(this.inputDoc, [userID]);
+    private addUserFSM(userID: string, fsm?: FSM<ICTTStateData, ICTTTransitionData>): void {
+        const binding = new SDBBinding(this.inputDoc, [userID], fsm);
         this.bindings.set(userID, binding);
         this.ttsm.addUserFSM(userID, binding.getFSM());
     }
