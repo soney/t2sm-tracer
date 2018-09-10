@@ -1,4 +1,5 @@
 import * as express from 'express';
+import * as fs from 'fs';
 import * as http from 'http';
 import { keys } from 'lodash';
 import * as path from 'path';
@@ -37,6 +38,35 @@ export class TraceTrackerServer {
         }).then(() => {
             this.traceTreeBinding = new SDBBinding(this.outputDoc, ['traceTree'], this.ttsm.getTraceTree());
             this.outputFSMBinding = new SDBBinding(this.outputDoc, ['outputFSM'], this.ttsm.getOutputFSM());
+        });
+    }
+
+    public saveCurrentTraces(filename: string = 'traces.json'): Promise<void> {
+        return new Promise<void> ((resolve, reject) => {
+            const serializedTraces = this.ttsm.serializeCurrentTraces();
+            const stringifiedTraces = JSON.stringify(serializedTraces);
+
+            fs.writeFile(filename, stringifiedTraces, (err) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+
+    public readTraces(filename: string = 'traces.json'): Promise<void> {
+        return new Promise<void> ((resolve, reject) => {
+            fs.readFile(filename, 'utf8', (err, stringifiedData) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    const data = JSON.parse(stringifiedData);
+                    this.ttsm.loadSerializedTraces(data);
+                    resolve();
+                }
+            });
         });
     }
 

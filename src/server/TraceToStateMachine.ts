@@ -1,5 +1,6 @@
-import { extend, isEqual } from 'lodash';
+import { each, extend, isEqual } from 'lodash';
 import { FSM } from 't2sm';
+import { SerializedFSM } from 't2sm/built/state_machine/FSM';
 import { cloneIntoFSM } from '../utils/cloneIntoFSM';
 import { ICTTStateData, ICTTTransitionData, ITraceTreeState, ITraceTreeTransition } from '../utils/FSMInterfaces';
 import { HashMap } from './HashMap';
@@ -36,6 +37,21 @@ export class TraceToStateMachine {
 
     public getOutputFSM(): FSM<ITraceTreeState, ITraceTreeTransition> {
         return this.outputFSM;
+    }
+
+    public serializeCurrentTraces(): { [uid: string]: SerializedFSM } {
+        const rv = {};
+        this.traceFSMs.forEach((val: FSM<ICTTStateData, ICTTTransitionData>, uid: string) => {
+            rv[uid] = val.serialize();
+        });
+        return rv;
+    };
+
+    public loadSerializedTraces(traces: { [uid: string]: SerializedFSM }): void {
+        each(traces, (trace: SerializedFSM, uid: string) => {
+            const fsm: FSM<ICTTStateData, ICTTTransitionData> = FSM.deserialize(trace);
+            this.addUserFSM(uid, fsm);
+        });
     }
 
     private updateTraceTree(userID: string): void {
